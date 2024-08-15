@@ -15,7 +15,7 @@ const SCREEN_SIZE: (f32, f32) = (
     GRID_WIDTH as f32 * GRID_CELL_SIZE as f32,
     GRID_HEIGHT as f32 * GRID_CELL_SIZE as f32,
 );
-const TARGET_FPS: u32 = 10;
+const TARGET_FPS: u32 = 15;
 
 // GameState struct to maintain the game state
 struct GameState {
