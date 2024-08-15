@@ -8,14 +8,14 @@ use ggez::{
 use rand::Rng;
 
 // Constants for grid and screen dimensions
-const GRID_WIDTH: isize = 32;
-const GRID_HEIGHT: isize = 32;
-const GRID_CELL_SIZE: isize = 20;
+const GRID_WIDTH: u32 = 100;
+const GRID_HEIGHT: u32 = 64;
+const GRID_CELL_SIZE: u32 = 20;
 const SCREEN_SIZE: (f32, f32) = (
     GRID_WIDTH as f32 * GRID_CELL_SIZE as f32,
     GRID_HEIGHT as f32 * GRID_CELL_SIZE as f32,
 );
-const TARGET_FPS: u32 = 15;
+const TARGET_FPS: u32 = 10;
 
 // GameState struct to maintain the game state
 struct GameState {
@@ -46,8 +46,8 @@ impl GameState {
         //not grid coordinates.
         //Without this scaling, I was only able to spawn cells neaer the top left corner
 
-        let grid_x = (x / GRID_CELL_SIZE as f32) as isize;
-        let grid_y = (y / GRID_CELL_SIZE as f32) as isize;
+        let grid_x = (x / GRID_CELL_SIZE as f32) as u32;
+        let grid_y = (y / GRID_CELL_SIZE as f32) as u32;
 
         if let Some(cell) = self.board.get_cell_mut(grid_x, grid_y) {
             cell.alive = true;
@@ -68,11 +68,13 @@ impl EventHandler for GameState {
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         let mut canvas = graphics::Canvas::from_frame(ctx, Color::WHITE);
 
-        for cell in &self.board.cells {
+        for (index, cell) in self.board.cells.iter().enumerate() {
             if cell.alive {
+                let x: u32 = index as u32 % GRID_WIDTH;
+                let y: u32 = index as u32 / GRID_WIDTH;
                 let rect = Rect::new(
-                    (cell.pos_x * GRID_CELL_SIZE) as f32,
-                    (cell.pos_y * GRID_CELL_SIZE) as f32,
+                    (x * GRID_CELL_SIZE) as f32,
+                    (y * GRID_CELL_SIZE) as f32,
                     GRID_CELL_SIZE as f32,
                     GRID_CELL_SIZE as f32,
                 );
@@ -135,17 +137,17 @@ impl EventHandler for GameState {
 // Board struct representing the game board
 struct Board {
     cells: Vec<Cell>,
-    width: isize,
-    height: isize,
+    width: u32,
+    height: u32,
 }
 
 impl Board {
     // Create a new board with the given dimensions
-    fn new(width: isize, height: isize) -> Board {
+    fn new(width: u32, height: u32) -> Board {
         let mut cells = vec![];
-        for y in 0..height {
-            for x in 0..width {
-                cells.push(Cell::new(x, y));
+        for _ in 0..height {
+            for _ in 0..width {
+                cells.push(Cell::new());
             }
         }
         Board {
@@ -163,34 +165,37 @@ impl Board {
     }
 
     // Get a mutable reference to a cell at the given coordinates
-    fn get_cell_mut(&mut self, x: isize, y: isize) -> Option<&mut Cell> {
-        if x >= 0 && x < self.width && y >= 0 && y < self.height {
+    fn get_cell_mut(&mut self, x: u32, y: u32) -> Option<&mut Cell> {
+        if x as isize >= 0 && x < self.width && y as isize >= 0 && y < self.height {
             Some(&mut self.cells[((y * self.width) + x) as usize])
         } else {
             None
         }
     }
 
-    fn get_cell(&self, x: isize, y: isize) -> Option<&Cell> {
-        if x >= 0 && x < self.width && y >= 0 && y < self.height {
+    fn get_cell(&self, x: u32, y: u32) -> Option<&Cell> {
+        if x as isize >= 0 && x < self.width && y as isize >= 0 && y < self.height {
             Some(&self.cells[((y * self.width) + x) as usize])
         } else {
             None
         }
     }
 
-    // Update the board based on the rules of the game
+    // Update the board based on the rules of the game.
     fn update(&mut self) {
         let mut new_cells = self.cells.clone();
 
-        for cell in &mut new_cells {
-            let alive_neighbors = self.count_alive_neighbors(cell.pos_x, cell.pos_y);
+        for i in 0..self.cells.len() {
+            let x: i32 = i as i32 % self.width as i32;
+            let y: i32 = i as i32 / self.width as i32;
+            let cell = self.cells[i];
+            let alive_neighbors = self.count_alive_neighbors(x, y);
 
             match (cell.alive, alive_neighbors) {
-                (true, 2) | (true, 3) => cell.alive = true,
-                (true, _) => cell.alive = false,
-                (false, 3) => cell.alive = true,
-                _ => cell.alive = false,
+                (true, 2) | (true, 3) => new_cells[i].alive = true,
+                (true, _) => new_cells[i].alive = false,
+                (false, 3) => new_cells[i].alive = true,
+                _ => new_cells[i].alive = false,
             }
         }
 
@@ -198,7 +203,7 @@ impl Board {
     }
 
     // Count the number of alive neighbors for a cell
-    fn count_alive_neighbors(&mut self, x: isize, y: isize) -> usize {
+    fn count_alive_neighbors(&mut self, x: i32, y: i32) -> usize {
         let mut count = 0;
 
         for ny in y - 1..=y + 1 {
@@ -207,7 +212,7 @@ impl Board {
                     continue;
                 }
 
-                if let Some(cell) = self.get_cell(nx, ny) {
+                if let Some(cell) = self.get_cell(nx as u32, ny as u32) {
                     if cell.alive {
                         count += 1;
                     }
@@ -223,18 +228,12 @@ impl Board {
 #[derive(Debug, Clone, Copy)]
 struct Cell {
     alive: bool,
-    pos_x: isize,
-    pos_y: isize,
 }
 
 impl Cell {
     // Create a new cell at the given position
-    fn new(pos_x: isize, pos_y: isize) -> Cell {
-        Cell {
-            alive: false,
-            pos_x,
-            pos_y,
-        }
+    fn new() -> Cell {
+        Cell { alive: false }
     }
 }
 
