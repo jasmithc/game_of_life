@@ -17,120 +17,16 @@ const SCREEN_SIZE: (f32, f32) = (
 );
 const TARGET_FPS: u32 = 10;
 
-// GameState struct to maintain the game state
-struct GameState {
-    board: Board,
-    mouse_down: bool,
+// Cell struct representing an individual cell on the board
+#[derive(Debug, Clone, Copy)]
+struct Cell {
+    alive: bool,
 }
 
-impl GameState {
-    // Initialize a new game state with a randomized board
-    fn new() -> GameState {
-        let mut game = GameState {
-            board: Board::new(GRID_WIDTH, GRID_HEIGHT),
-            mouse_down: false,
-        };
-        game.randomize();
-        game
-    }
-
-    // Randomize the board
-    fn randomize(&mut self) {
-        self.board.randomize();
-    }
-
-    // Handle mouse events to "spawn" cells
-    fn handle_mouse(&mut self, x: f32, y: f32) {
-        //Scale the mouse coordinate to the grid coordinates.
-        //This is necessary because the mouse coordinates are in screen coordinates,
-        //not grid coordinates.
-        //Without this scaling, I was only able to spawn cells neaer the top left corner
-
-        let grid_x = (x / GRID_CELL_SIZE as f32) as u32;
-        let grid_y = (y / GRID_CELL_SIZE as f32) as u32;
-
-        if let Some(cell) = self.board.get_cell_mut(grid_x, grid_y) {
-            cell.alive = true;
-        }
-    }
-}
-
-impl EventHandler for GameState {
-    // Update the game state
-    fn update(&mut self, ctx: &mut Context) -> GameResult {
-        while ctx.time.check_update_time(TARGET_FPS) {
-            self.board.update();
-        }
-        Ok(())
-    }
-
-    // Draw the game board
-    fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        let mut canvas = graphics::Canvas::from_frame(ctx, Color::WHITE);
-
-        for (index, cell) in self.board.cells.iter().enumerate() {
-            if cell.alive {
-                let x: u32 = index as u32 % GRID_WIDTH;
-                let y: u32 = index as u32 / GRID_WIDTH;
-                let rect = Rect::new(
-                    (x * GRID_CELL_SIZE) as f32,
-                    (y * GRID_CELL_SIZE) as f32,
-                    GRID_CELL_SIZE as f32,
-                    GRID_CELL_SIZE as f32,
-                );
-
-                let square = Mesh::new_rectangle(ctx, DrawMode::fill(), rect, Color::BLACK)?;
-                canvas.draw(&square, DrawParam::default());
-            }
-        }
-
-        canvas.finish(ctx)?;
-        ggez::timer::yield_now();
-        Ok(())
-    }
-
-    // Handle mouse button down event
-    fn mouse_button_down_event(
-        &mut self,
-        _ctx: &mut Context,
-        button: mouse::MouseButton,
-        x: f32,
-        y: f32,
-    ) -> GameResult {
-        if button == mouse::MouseButton::Left {
-            self.mouse_down = true;
-            self.handle_mouse(x, y);
-        }
-        Ok(())
-    }
-
-    // Handle mouse button up event
-    fn mouse_button_up_event(
-        &mut self,
-        _ctx: &mut Context,
-        button: mouse::MouseButton,
-        _: f32,
-        _: f32,
-    ) -> GameResult {
-        if button == mouse::MouseButton::Left {
-            self.mouse_down = false;
-        }
-        Ok(())
-    }
-
-    // Handle mouse motion event
-    fn mouse_motion_event(
-        &mut self,
-        _: &mut Context,
-        x: f32,
-        y: f32,
-        _: f32,
-        _: f32,
-    ) -> GameResult {
-        if self.mouse_down {
-            self.handle_mouse(x, y);
-        }
-        Ok(())
+impl Cell {
+    // Create a new cell at the given position
+    fn new() -> Cell {
+        Cell { alive: false }
     }
 }
 
@@ -224,16 +120,123 @@ impl Board {
     }
 }
 
-// Cell struct representing an individual cell on the board
-#[derive(Debug, Clone, Copy)]
-struct Cell {
-    alive: bool,
+// GameState struct to maintain the game state
+struct GameState {
+    main_board: Board,
+    future_board: Board,
+    mouse_down: bool,
 }
 
-impl Cell {
-    // Create a new cell at the given position
-    fn new() -> Cell {
-        Cell { alive: false }
+impl GameState {
+    // Initialize a new game state with a randomized board
+    fn new() -> GameState {
+        let mut game = GameState {
+            main_board: Board::new(GRID_WIDTH, GRID_HEIGHT),
+            future_board: Board::new(GRID_WIDTH, GRID_HEIGHT),
+            mouse_down: false,
+        };
+        game.randomize();
+        game
+    }
+
+    // Randomize the board
+    fn randomize(&mut self) {
+        self.main_board.randomize();
+    }
+
+    // Handle mouse events to "spawn" cells
+    fn handle_mouse(&mut self, x: f32, y: f32) {
+        //Scale the mouse coordinate to the grid coordinates.
+        //This is necessary because the mouse coordinates are in screen coordinates,
+        //not grid coordinates.
+        //Without this scaling, I was only able to spawn cells neaer the top left corner
+
+        let grid_x = (x / GRID_CELL_SIZE as f32) as u32;
+        let grid_y = (y / GRID_CELL_SIZE as f32) as u32;
+
+        if let Some(cell) = self.main_board.get_cell_mut(grid_x, grid_y) {
+            cell.alive = true;
+        }
+    }
+}
+
+impl EventHandler for GameState {
+    // Update the game state
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
+        while ctx.time.check_update_time(TARGET_FPS) {
+            self.main_board.update();
+        }
+        Ok(())
+    }
+
+    // Draw the game board
+    fn draw(&mut self, ctx: &mut Context) -> GameResult {
+        let mut canvas = graphics::Canvas::from_frame(ctx, Color::WHITE);
+
+        for i in 0..self.main_board.cells.len() {
+            let cell = self.main_board.cells[i];
+            if cell.alive {
+                let x: u32 = i as u32 % GRID_WIDTH;
+                let y: u32 = i as u32 / GRID_WIDTH;
+                let rect = Rect::new(
+                    (x * GRID_CELL_SIZE) as f32,
+                    (y * GRID_CELL_SIZE) as f32,
+                    GRID_CELL_SIZE as f32,
+                    GRID_CELL_SIZE as f32,
+                );
+
+                let square = Mesh::new_rectangle(ctx, DrawMode::fill(), rect, Color::BLACK)?;
+                canvas.draw(&square, DrawParam::default());
+            }
+        }
+
+        canvas.finish(ctx)?;
+        ggez::timer::yield_now();
+        Ok(())
+    }
+
+    // Handle mouse button down event
+    fn mouse_button_down_event(
+        &mut self,
+        _ctx: &mut Context,
+        button: mouse::MouseButton,
+        x: f32,
+        y: f32,
+    ) -> GameResult {
+        if button == mouse::MouseButton::Left {
+            self.mouse_down = true;
+            self.handle_mouse(x, y);
+        }
+        Ok(())
+    }
+
+    // Handle mouse button up event
+    fn mouse_button_up_event(
+        &mut self,
+        _ctx: &mut Context,
+        button: mouse::MouseButton,
+        _: f32,
+        _: f32,
+    ) -> GameResult {
+        if button == mouse::MouseButton::Left {
+            self.mouse_down = false;
+        }
+        Ok(())
+    }
+
+    // Handle mouse motion event
+    fn mouse_motion_event(
+        &mut self,
+        _: &mut Context,
+        x: f32,
+        y: f32,
+        _: f32,
+        _: f32,
+    ) -> GameResult {
+        if self.mouse_down {
+            self.handle_mouse(x, y);
+        }
+        Ok(())
     }
 }
 
