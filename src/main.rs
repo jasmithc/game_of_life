@@ -1,16 +1,15 @@
-// Import necessary modules and dependencies
 use ggez::{
     event::{self, EventHandler},
     graphics::{self, Color, DrawMode, DrawParam, Mesh, Rect},
     input::mouse,
     Context, ContextBuilder, GameResult,
 };
-use rand::Rng;
+
 use std::time::{Duration, Instant};
 
 // Constants for grid and screen dimensions
-const GRID_WIDTH: u32 = 100;
-const GRID_HEIGHT: u32 = 100;
+const GRID_WIDTH: u32 = 200;
+const GRID_HEIGHT: u32 = 200;
 const GRID_CELL_SIZE: i32 = 8;
 const SCREEN_SIZE: (f32, f32) = (
     GRID_WIDTH as f32 * GRID_CELL_SIZE as f32,
@@ -28,20 +27,6 @@ fn get_coordinates(i: i32) -> (i32, i32) {
     (x, y)
 }
 
-// // Cell struct representing an individual cell on the board
-// #[derive(Debug, Clone, Copy)]
-// struct Cell {
-//     alive: bool,
-// }
-
-// impl Cell {
-//     // Create a new cell at the given position
-//     fn new() -> Cell {
-//         Cell { alive: false }
-//     }
-// }
-
-// Board struct representing the game board
 struct Board {
     cells: Vec<u8>,
     width: u32,
@@ -66,10 +51,11 @@ impl Board {
 
     // Randomize the board's cells
     fn randomize(&mut self) {
-        for cell in self.cells.iter_mut() {
-            match rand::thread_rng().gen_range(0..=100) < 35 {
-                true => *cell = 1,
-                false => *cell = 0,
+        for i in 0..self.cells.len() {
+            if i % 3 == 0 {
+                self.cells[i] = 1;
+            } else {
+                self.cells[i] = 0;
             }
         }
     }
@@ -148,7 +134,7 @@ impl GameState {
             cycle: 0,
             last_update: Instant::now(),
             // I think this should be 60hz tick rate, but I'm not sure.
-            update_interval: Duration::from_secs_f32(0.01),
+            update_interval: Duration::from_secs_f32(1.0 / 60.0),
         };
         game.randomize();
         game
