@@ -9,8 +9,8 @@ use rand::Rng;
 use std::time::{Duration, Instant};
 
 // Constants for grid and screen dimensions
-const GRID_WIDTH: u32 = 64;
-const GRID_HEIGHT: u32 = 64;
+const GRID_WIDTH: u32 = 100;
+const GRID_HEIGHT: u32 = 100;
 const GRID_CELL_SIZE: i32 = 8;
 const SCREEN_SIZE: (f32, f32) = (
     GRID_WIDTH as f32 * GRID_CELL_SIZE as f32,
@@ -28,22 +28,22 @@ fn get_coordinates(i: i32) -> (i32, i32) {
     (x, y)
 }
 
-// Cell struct representing an individual cell on the board
-#[derive(Debug, Clone, Copy)]
-struct Cell {
-    alive: bool,
-}
+// // Cell struct representing an individual cell on the board
+// #[derive(Debug, Clone, Copy)]
+// struct Cell {
+//     alive: bool,
+// }
 
-impl Cell {
-    // Create a new cell at the given position
-    fn new() -> Cell {
-        Cell { alive: false }
-    }
-}
+// impl Cell {
+//     // Create a new cell at the given position
+//     fn new() -> Cell {
+//         Cell { alive: false }
+//     }
+// }
 
 // Board struct representing the game board
 struct Board {
-    cells: Vec<Cell>,
+    cells: Vec<u8>,
     width: u32,
     height: u32,
 }
@@ -54,7 +54,7 @@ impl Board {
         let mut cells = vec![];
         for _ in 0..height {
             for _ in 0..width {
-                cells.push(Cell::new());
+                cells.push(0);
             }
         }
         Board {
@@ -67,12 +67,15 @@ impl Board {
     // Randomize the board's cells
     fn randomize(&mut self) {
         for cell in self.cells.iter_mut() {
-            cell.alive = rand::thread_rng().gen_range(0..=100) < 35;
+            match rand::thread_rng().gen_range(0..=100) < 35 {
+                true => *cell = 1,
+                false => *cell = 0,
+            }
         }
     }
 
     // Get a mutable reference to a cell at the given coordinates
-    fn get_cell_mut(&mut self, x: u32, y: u32) -> Option<&mut Cell> {
+    fn get_cell_mut(&mut self, x: u32, y: u32) -> Option<&mut u8> {
         if x as isize >= 0 && x < self.width && y as isize >= 0 && y < self.height {
             Some(&mut self.cells[((y * self.width) + x) as usize])
         } else {
@@ -80,7 +83,7 @@ impl Board {
         }
     }
 
-    fn get_cell(&self, x: u32, y: u32) -> Option<&Cell> {
+    fn get_cell(&self, x: u32, y: u32) -> Option<&u8> {
         if x as isize >= 0 && x < self.width && y as isize >= 0 && y < self.height {
             Some(&self.cells[((y * self.width) + x) as usize])
         } else {
@@ -94,14 +97,12 @@ impl Board {
             let cell = &self.cells[i];
             let alive_neighbors = &self.count_alive_neighbors(i as i32);
 
-            future_board.cells[i].alive = match (cell.alive, alive_neighbors) {
-                (true, 2) | (true, 3) => true,
-                (false, 3) => true,
-                _ => false,
+            future_board.cells[i] = match (cell, alive_neighbors) {
+                (1, 2) | (1, 3) => 1,
+                (0, 3) => 1,
+                _ => 0,
             }
         }
-
-        // self.cells.clone_from_slice(&future_board.cells);
     }
 
     // Count the number of alive neighbors for a cell
@@ -115,8 +116,8 @@ impl Board {
                     continue;
                 }
 
-                if let Some(cell) = self.get_cell(nx as u32, ny as u32) {
-                    if cell.alive {
+                if let Some(&cell) = self.get_cell(nx as u32, ny as u32) {
+                    if cell != 0 {
                         count += 1;
                     }
                 }
@@ -147,7 +148,7 @@ impl GameState {
             cycle: 0,
             last_update: Instant::now(),
             // I think this should be 60hz tick rate, but I'm not sure.
-            update_interval: Duration::from_secs_f32(1.0 / 60.0),
+            update_interval: Duration::from_secs_f32(0.01),
         };
         game.randomize();
         game
@@ -172,7 +173,7 @@ impl GameState {
             0 => self.board_1.get_cell_mut(grid_x, grid_y),
             _ => self.board_2.get_cell_mut(grid_x, grid_y),
         } {
-            cell.alive = true;
+            *cell = 1;
         }
     }
 }
@@ -192,13 +193,11 @@ impl EventHandler for GameState {
 
             self.cycle += 1;
 
-            if self.cycle <= 1000 {
-                println!(
-                    "Cycle {}: Update took {:?}",
-                    self.cycle,
-                    self.last_update.elapsed()
-                );
-            }
+            println!(
+                "Cycle {}: Update took {:?}",
+                self.cycle,
+                self.last_update.elapsed()
+            );
         }
 
         Ok(())
@@ -214,7 +213,7 @@ impl EventHandler for GameState {
 
         for i in 0..self.board_1.cells.len() {
             let cell = self.board_1.cells[i];
-            if cell.alive {
+            if cell == 1 {
                 let (x, y) = get_coordinates(i as i32);
                 let rect = Rect::new(
                     (x * GRID_CELL_SIZE) as f32,
