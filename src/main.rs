@@ -16,7 +16,7 @@ const SCREEN_SIZE: (f32, f32) = (
     GRID_WIDTH as f32 * GRID_CELL_SIZE as f32,
     GRID_HEIGHT as f32 * GRID_CELL_SIZE as f32,
 );
-const TARGET_FPS: f64 = 120.0;
+const TARGET_FPS: f64 = 90.0;
 
 // Utility functions
 
@@ -146,7 +146,8 @@ impl GameState {
             mouse_down: false,
             cycle: 0,
             last_update: Instant::now(),
-            update_interval: Duration::from_secs_f32(0.0005),
+            // I think this should be 60hz tick rate, but I'm not sure.
+            update_interval: Duration::from_secs_f32(1.0 / 60.0),
         };
         game.randomize();
         game
