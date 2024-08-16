@@ -6,16 +6,27 @@ use ggez::{
     Context, ContextBuilder, GameResult,
 };
 use rand::Rng;
+use std::time::{Duration, Instant};
 
 // Constants for grid and screen dimensions
-const GRID_WIDTH: u32 = 100;
+const GRID_WIDTH: u32 = 64;
 const GRID_HEIGHT: u32 = 64;
-const GRID_CELL_SIZE: u32 = 20;
+const GRID_CELL_SIZE: i32 = 8;
 const SCREEN_SIZE: (f32, f32) = (
     GRID_WIDTH as f32 * GRID_CELL_SIZE as f32,
     GRID_HEIGHT as f32 * GRID_CELL_SIZE as f32,
 );
-const TARGET_FPS: u32 = 10;
+const TARGET_FPS: f64 = 120.0;
+
+// Utility functions
+
+// Moved this here as it was used in a few places.
+// Just calculates the x and y coordinates from the given index.
+fn get_coordinates(i: i32) -> (i32, i32) {
+    let x: i32 = i % GRID_WIDTH as i32;
+    let y: i32 = i / GRID_WIDTH as i32;
+    (x, y)
+}
 
 // Cell struct representing an individual cell on the board
 #[derive(Debug, Clone, Copy)]
@@ -56,7 +67,7 @@ impl Board {
     // Randomize the board's cells
     fn randomize(&mut self) {
         for cell in self.cells.iter_mut() {
-            cell.alive = rand::thread_rng().gen_range(0..=100) < 50;
+            cell.alive = rand::thread_rng().gen_range(0..=100) < 35;
         }
     }
 
@@ -78,28 +89,24 @@ impl Board {
     }
 
     // Update the board based on the rules of the game.
-    fn update(&mut self) {
-        let mut new_cells = self.cells.clone();
-
+    fn update(&mut self, future_board: &mut Board) {
         for i in 0..self.cells.len() {
-            let x: i32 = i as i32 % self.width as i32;
-            let y: i32 = i as i32 / self.width as i32;
-            let cell = self.cells[i];
-            let alive_neighbors = self.count_alive_neighbors(x, y);
+            let cell = &self.cells[i];
+            let alive_neighbors = &self.count_alive_neighbors(i as i32);
 
-            match (cell.alive, alive_neighbors) {
-                (true, 2) | (true, 3) => new_cells[i].alive = true,
-                (true, _) => new_cells[i].alive = false,
-                (false, 3) => new_cells[i].alive = true,
-                _ => new_cells[i].alive = false,
+            future_board.cells[i].alive = match (cell.alive, alive_neighbors) {
+                (true, 2) | (true, 3) => true,
+                (false, 3) => true,
+                _ => false,
             }
         }
 
-        self.cells = new_cells;
+        // self.cells.clone_from_slice(&future_board.cells);
     }
 
     // Count the number of alive neighbors for a cell
-    fn count_alive_neighbors(&mut self, x: i32, y: i32) -> usize {
+    fn count_alive_neighbors(&self, i: i32) -> usize {
+        let (x, y) = get_coordinates(i);
         let mut count = 0;
 
         for ny in y - 1..=y + 1 {
@@ -122,18 +129,24 @@ impl Board {
 
 // GameState struct to maintain the game state
 struct GameState {
-    main_board: Board,
-    future_board: Board,
+    board_1: Board,
+    board_2: Board,
     mouse_down: bool,
+    cycle: u32,                // Track the current cycle
+    last_update: Instant,      // Track the last update time
+    update_interval: Duration, // Set the update interval
 }
 
 impl GameState {
     // Initialize a new game state with a randomized board
     fn new() -> GameState {
         let mut game = GameState {
-            main_board: Board::new(GRID_WIDTH, GRID_HEIGHT),
-            future_board: Board::new(GRID_WIDTH, GRID_HEIGHT),
+            board_1: Board::new(GRID_WIDTH, GRID_HEIGHT),
+            board_2: Board::new(GRID_WIDTH, GRID_HEIGHT),
             mouse_down: false,
+            cycle: 0,
+            last_update: Instant::now(),
+            update_interval: Duration::from_secs_f32(0.0005),
         };
         game.randomize();
         game
@@ -141,7 +154,7 @@ impl GameState {
 
     // Randomize the board
     fn randomize(&mut self) {
-        self.main_board.randomize();
+        self.board_1.randomize();
     }
 
     // Handle mouse events to "spawn" cells
@@ -154,7 +167,10 @@ impl GameState {
         let grid_x = (x / GRID_CELL_SIZE as f32) as u32;
         let grid_y = (y / GRID_CELL_SIZE as f32) as u32;
 
-        if let Some(cell) = self.main_board.get_cell_mut(grid_x, grid_y) {
+        if let Some(cell) = match self.cycle % 2 {
+            0 => self.board_1.get_cell_mut(grid_x, grid_y),
+            _ => self.board_2.get_cell_mut(grid_x, grid_y),
+        } {
             cell.alive = true;
         }
     }
@@ -162,22 +178,43 @@ impl GameState {
 
 impl EventHandler for GameState {
     // Update the game state
-    fn update(&mut self, ctx: &mut Context) -> GameResult {
-        while ctx.time.check_update_time(TARGET_FPS) {
-            self.main_board.update();
+    fn update(&mut self, _ctx: &mut Context) -> GameResult {
+        // Check if it's time to update the board
+        if self.last_update.elapsed() >= self.update_interval {
+            self.last_update = Instant::now(); // Reset the timer
+
+            let (current_board, future_board) = match self.cycle % 2 {
+                0 => (&mut self.board_1, &mut self.board_2),
+                _ => (&mut self.board_2, &mut self.board_1),
+            };
+            current_board.update(future_board);
+
+            self.cycle += 1;
+
+            if self.cycle <= 1000 {
+                println!(
+                    "Cycle {}: Update took {:?}",
+                    self.cycle,
+                    self.last_update.elapsed()
+                );
+            }
         }
+
         Ok(())
     }
 
     // Draw the game board
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
+        let frame_duration = Duration::from_secs_f64(1.0 / TARGET_FPS);
+
+        let start_time = Instant::now();
+
         let mut canvas = graphics::Canvas::from_frame(ctx, Color::WHITE);
 
-        for i in 0..self.main_board.cells.len() {
-            let cell = self.main_board.cells[i];
+        for i in 0..self.board_1.cells.len() {
+            let cell = self.board_1.cells[i];
             if cell.alive {
-                let x: u32 = i as u32 % GRID_WIDTH;
-                let y: u32 = i as u32 / GRID_WIDTH;
+                let (x, y) = get_coordinates(i as i32);
                 let rect = Rect::new(
                     (x * GRID_CELL_SIZE) as f32,
                     (y * GRID_CELL_SIZE) as f32,
@@ -191,7 +228,15 @@ impl EventHandler for GameState {
         }
 
         canvas.finish(ctx)?;
-        ggez::timer::yield_now();
+
+        // Calculate the time taken to render the frame
+        let elapsed = start_time.elapsed();
+
+        // Sleep the remaining time to achieve the target frame rate
+        if elapsed < frame_duration {
+            ggez::timer::sleep(frame_duration - elapsed);
+        }
+
         Ok(())
     }
 
