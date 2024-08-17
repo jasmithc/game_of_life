@@ -4,6 +4,7 @@ use ggez::{
     input::mouse,
     Context, ContextBuilder, GameResult,
 };
+use rand::Rng;
 
 use std::time::{Duration, Instant};
 
@@ -17,6 +18,8 @@ const SCREEN_SIZE: (f32, f32) = (
 );
 const TARGET_FPS: f64 = 90.0;
 
+const ROLLOVER: bool = false;
+
 // Utility functions
 
 // Moved this here as it was used in a few places.
@@ -26,6 +29,11 @@ fn get_coordinates(i: i32) -> (i32, i32) {
     let y: i32 = i / GRID_WIDTH as i32;
     (x, y)
 }
+
+// Unused for now. Not sure if it works or if its even needed.
+// fn get_index_from_coordinates(x: i32, y: i32) -> i32 {
+//     x + y * GRID_WIDTH as i32
+// }
 
 struct Board {
     cells: Vec<u8>,
@@ -46,12 +54,13 @@ impl Board {
 
     // Randomize the board's cells
     fn randomize(&mut self) {
-        for i in 0..self.cells.len() {
-            if i % 3 == 0 {
-                self.cells[i] = 1;
-            } else {
-                self.cells[i] = 0;
+        for i in 0..self.cells.len() as i32 {
+            if rand::thread_rng().gen_range(0..=100) < 35 {
+                self.cells[i as usize] = 1;
             }
+            // if i % 7 == 1 {
+            //     self.cells[i as usize] = 1;
+            // }
         }
     }
 
@@ -105,7 +114,18 @@ impl Board {
         ];
 
         for (nx, ny) in neighbor_coordinates {
-            if let Some(&cell) = self.get_cell((x + nx) as u32, (y + ny) as u32) {
+            let x = if ROLLOVER {
+                (x + nx + self.width as i32) % self.width as i32
+            } else {
+                x + nx
+            };
+            let y = if ROLLOVER {
+                (y + ny + self.height as i32) % self.height as i32
+            } else {
+                y + ny
+            };
+
+            if let Some(&cell) = self.get_cell(x as u32, y as u32) {
                 count += cell;
             }
         }
