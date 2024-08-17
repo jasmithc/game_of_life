@@ -93,7 +93,7 @@ impl Board {
 
         // precalculating the coordinates of the neighbors rather than using a loop.
         // This seems to be faster.
-        let neighbor_coordinates = [
+        let neighbor_coordinates: [(i32, i32); 8] = [
             (-1, -1),
             (0, -1),
             (1, -1),
