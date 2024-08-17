@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 // Constants for grid and screen dimensions
 const GRID_WIDTH: u32 = 200;
 const GRID_HEIGHT: u32 = 200;
-const GRID_CELL_SIZE: i32 = 4;
+const GRID_CELL_SIZE: i32 = 8;
 const SCREEN_SIZE: (f32, f32) = (
     GRID_WIDTH as f32 * GRID_CELL_SIZE as f32,
     GRID_HEIGHT as f32 * GRID_CELL_SIZE as f32,
