@@ -36,12 +36,7 @@ struct Board {
 impl Board {
     // Create a new board with the given dimensions
     fn new(width: u32, height: u32) -> Board {
-        let mut cells = vec![];
-        for _ in 0..height {
-            for _ in 0..width {
-                cells.push(0);
-            }
-        }
+        let cells = vec![0; (width * height) as usize];
         Board {
             cells,
             width,
@@ -92,21 +87,26 @@ impl Board {
     }
 
     // Count the number of alive neighbors for a cell
-    fn count_alive_neighbors(&self, i: i32) -> usize {
+    fn count_alive_neighbors(&self, i: i32) -> u8 {
         let (x, y) = get_coordinates(i);
         let mut count = 0;
 
-        for ny in y - 1..=y + 1 {
-            for nx in x - 1..=x + 1 {
-                if nx == x && ny == y {
-                    continue;
-                }
+        // precalculating the coordinates of the neighbors rather than using a loop.
+        // This seems to be a lot faster.
+        let neighbor_coordinates = [
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+            (-1, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+        ];
 
-                if let Some(&cell) = self.get_cell(nx as u32, ny as u32) {
-                    if cell != 0 {
-                        count += 1;
-                    }
-                }
+        for (nx, ny) in neighbor_coordinates {
+            if let Some(&cell) = self.get_cell((x + nx) as u32, (y + ny) as u32) {
+                count += cell;
             }
         }
 
