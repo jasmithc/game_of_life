@@ -5,7 +5,7 @@
 ### Avoid unnecessary loops.
 
 Each update cycle, I was using a loop to find the neighbors of a given cell and
-then check if that cell is was alive or not. This meant that each update cycle,
+then check if that cell was alive or not. This meant that each update cycle,
 I was throwing away the work to calculate the neighbors. Doing the math ahead of
 time and keeping the results stored in an array that I could use to look up the
 neighbors of a given cell turned out to be much faster.
